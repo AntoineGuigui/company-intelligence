@@ -1,0 +1,21 @@
+# Outputs
+outputs/
+*.xlsx
+*.xlsm
+
+# Template (proprietary)
+template/Template.pptx
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Environment
+.env
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
