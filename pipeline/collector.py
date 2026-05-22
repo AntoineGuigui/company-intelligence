@@ -1,10 +1,10 @@
 """
-pipeline/collector.py — Web data collection for defence companies.
+pipeline/collector.py — Web data collection for companies.
 
 Sources (all free, no API key required):
-  - DuckDuckGo text search
-  - Wikipedia API
-  - Yahoo Finance (via yfinance)
+  - DuckDuckGo text search + full page scraping (BeautifulSoup)
+  - Wikipedia REST API (structured JSON, no scraping needed)
+  - Yahoo Finance via yfinance (structured data, no scraping needed)
 """
 
 import logging
@@ -16,26 +16,77 @@ from duckduckgo_search import DDGS
 
 logger = logging.getLogger(__name__)
 
+URLS_TO_SCRAPE = 3  # Number of URLs to scrape per DuckDuckGo query
+
 
 # -------------------------------------------------------
-# DUCKDUCKGO
+# DUCKDUCKGO + PAGE SCRAPING
 # -------------------------------------------------------
 
-def _ddg_search(query: str, max_results: int = 5) -> str:
-    """Run a DuckDuckGo text search and return concatenated snippets."""
+def _fetch_page_text(url: str, max_chars: int = 30_000) -> str:
+    """
+    Fetch a web page and return cleaned text via BeautifulSoup.
+    Returns empty string silently on any error (timeout, block, 403...).
+    """
+    try:
+        resp = requests.get(
+            url,
+            timeout=8,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; CompanyIntelBot/1.0)"},
+        )
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
+            tag.decompose()
+        text = soup.get_text(separator="\n", strip=True)
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+        return "\n".join(lines)[:max_chars]
+    except Exception as e:
+        logger.debug(f"Skipped {url}: {e}")
+        return ""
+
+
+def _ddg_search_and_scrape(query: str, max_results: int = 5) -> str:
+    """
+    Run a DuckDuckGo search, then scrape the top URLS_TO_SCRAPE pages.
+    Returns a concatenated string of:
+      - DDG snippets for all results
+      - Full page text for the top scraped URLs
+    """
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=max_results))
-        texts = []
-        for r in results:
-            title = r.get("title", "")
-            body  = r.get("body", "")
-            href  = r.get("href", "")
-            texts.append(f"[{title}] ({href})\n{body}")
-        return "\n\n".join(texts)
     except Exception as e:
         logger.warning(f"DuckDuckGo search failed for '{query}': {e}")
         return ""
+
+    if not results:
+        return ""
+
+    parts = []
+
+    # DDG snippets for all results
+    for r in results:
+        title = r.get("title", "")
+        body  = r.get("body", "")
+        href  = r.get("href", "")
+        parts.append(f"[{title}] ({href})\n{body}")
+
+    # Full page scraping for top N URLs
+    scraped = 0
+    for r in results:
+        if scraped >= URLS_TO_SCRAPE:
+            break
+        url = r.get("href", "")
+        if not url:
+            continue
+        page_text = _fetch_page_text(url)
+        if page_text:
+            parts.append(f"=== Full page: {url} ===\n{page_text}")
+            scraped += 1
+        # If scraping fails, skip silently and try next URL
+
+    return "\n\n".join(parts)
 
 
 # -------------------------------------------------------
@@ -44,21 +95,25 @@ def _ddg_search(query: str, max_results: int = 5) -> str:
 
 def _wikipedia(company: str) -> str:
     """
-    Fetch the Wikipedia summary and intro section for a company.
-    Uses the Wikipedia REST API — no key required.
-    Tries the company name directly, then appends common suffixes if not found.
+    Fetch the Wikipedia summary for a company via the REST API (structured JSON).
+    No BeautifulSoup needed — Wikipedia returns clean text directly.
+    Tries company name, then common suffixes if not found.
     """
     candidates = [
         company,
         f"{company} (company)",
-        f"{company} (defence)",
+        f"{company} (corporation)",
     ]
 
     for candidate in candidates:
         try:
             slug = urllib.parse.quote(candidate.replace(" ", "_"))
             url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{slug}"
-            resp = requests.get(url, timeout=10, headers={"User-Agent": "DefenceIntelBot/1.0"})
+            resp = requests.get(
+                url,
+                timeout=10,
+                headers={"User-Agent": "CompanyIntelBot/1.0"},
+            )
             if resp.status_code == 404:
                 continue
             resp.raise_for_status()
@@ -66,7 +121,6 @@ def _wikipedia(company: str) -> str:
             if data.get("type") == "disambiguation":
                 continue
 
-            # Also fetch the intro section for more detail
             extract = data.get("extract", "")
             page_url = data.get("content_urls", {}).get("desktop", {}).get("page", "")
             logger.info(f"Wikipedia found: '{candidate}' → {page_url}")
@@ -78,26 +132,6 @@ def _wikipedia(company: str) -> str:
 
     logger.warning(f"No Wikipedia article found for '{company}'")
     return ""
-
-
-# -------------------------------------------------------
-# PAGE SCRAPING
-# -------------------------------------------------------
-
-def _fetch_page_text(url: str, max_chars: int = 15_000) -> str:
-    """Fetch a web page and return cleaned text."""
-    try:
-        resp = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
-            tag.decompose()
-        text = soup.get_text(separator="\n", strip=True)
-        lines = [l.strip() for l in text.splitlines() if l.strip()]
-        return "\n".join(lines)[:max_chars]
-    except Exception as e:
-        logger.warning(f"Failed to fetch {url}: {e}")
-        return ""
 
 
 # -------------------------------------------------------
@@ -128,7 +162,8 @@ def _resolve_ticker(company: str) -> str:
 
 def _yahoo_finance(ticker: str) -> dict:
     """
-    Pull financial data from Yahoo Finance for a given ticker.
+    Pull structured financial data from Yahoo Finance via yfinance.
+    No scraping needed — yfinance returns Python objects directly.
     Returns dict with financials by FY and company metadata.
     """
     if not ticker:
@@ -143,7 +178,7 @@ def _yahoo_finance(ticker: str) -> dict:
         inc = stock.financials
         if inc is not None and not inc.empty:
             for col in inc.columns:
-                fy  = f"FY{col.year % 100:02d}"
+                fy   = f"FY{col.year % 100:02d}"
                 rev  = inc.at["Total Revenue", col] if "Total Revenue" in inc.index else None
                 ebit = inc.at["EBIT", col]          if "EBIT"          in inc.index else None
                 net  = inc.at["Net Income", col]    if "Net Income"    in inc.index else None
@@ -190,40 +225,43 @@ def collect(
     ticker: str = "",
 ) -> dict:
     """
-    Collect raw data about a defence company from multiple sources.
+    Collect raw data about a company from multiple sources.
     No API key required.
 
+    Pipeline:
+      - DuckDuckGo: 4 queries → snippets + full page scraping (top 3 URLs each)
+      - Wikipedia:  REST API → structured summary (no scraping)
+      - Yahoo Finance: yfinance → structured financials (no scraping)
+
     Args:
-        company:  Company name (e.g. "Thales")
-        country:  Country (e.g. "France")
-        ticker:   Stock ticker — optional. Auto-resolved from company name if empty.
+        company: Company name (e.g. "Thales")
+        country: Country (e.g. "France")
+        ticker:  Stock ticker — optional. Auto-resolved from company name if empty.
 
     Returns a dict with keys:
-        - overview:        DuckDuckGo general search results
-        - capabilities:    DuckDuckGo defence capabilities results
-        - financials_web:  DuckDuckGo financial results
-        - relationships:   DuckDuckGo partnerships/customers results
-        - wikipedia:       Wikipedia intro section
-        - yahoo:           Yahoo Finance structured data
+        - overview, capabilities, financials_web, relationships: DDG + scraped pages
+        - wikipedia: Wikipedia summary
+        - yahoo: Yahoo Finance structured data
     """
-    # DuckDuckGo searches
     queries = {
-        "overview":       f"{company} {country} defence company overview",
-        "capabilities":   f"{company} defence capabilities products systems",
+        "overview":       f"{company} {country} company overview",
+        "capabilities":   f"{company} products services capabilities",
         "financials_web": f"{company} revenue employees annual report {country}",
-        "relationships":  f"{company} defence partnerships customers contracts",
+        "relationships":  f"{company} partnerships customers contracts",
     }
 
     raw_data = {}
-    for key, query in queries.items():
-        logger.info(f"Searching: {query}")
-        raw_data[key] = _ddg_search(query)
 
-    # Wikipedia
+    # DuckDuckGo + page scraping
+    for key, query in queries.items():
+        logger.info(f"Searching + scraping: {query}")
+        raw_data[key] = _ddg_search_and_scrape(query)
+
+    # Wikipedia (structured JSON — no scraping)
     logger.info(f"Fetching Wikipedia: '{company}'")
     raw_data["wikipedia"] = _wikipedia(company)
 
-    # Yahoo Finance — use provided ticker or resolve from name
+    # Yahoo Finance (structured data — no scraping)
     resolved_ticker = ticker.strip()
     if not resolved_ticker:
         logger.info(f"No ticker provided — resolving from company name: '{company}'")
