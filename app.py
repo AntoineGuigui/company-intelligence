@@ -22,7 +22,6 @@ BASE_DIR = Path(__file__).parent
 OUTPUT_DIR = BASE_DIR / "outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Excel database — same format as Company Profile Generator
 EXCEL_PATH = OUTPUT_DIR / "DataBase.xlsx"
 
 st.set_page_config(
@@ -86,9 +85,9 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 💡 Exemples")
     st.markdown("""
-    - `Thales` · France · `HO.PA`
-    - `Rheinmetall` · Germany · `RHM.DE`
-    - `MBDA` · France · *(privé)*
+    - `Thales` · France
+    - `Rheinmetall` · Germany
+    - `MBDA` · France *(privé, pas de ticker)*
     - `BAE Systems` · UK · `BA.L`
     - `Leonardo` · Italy · `LDO.MI`
     - `Safran` · France · `SAF.PA`
@@ -98,7 +97,7 @@ with st.sidebar:
 # MAIN
 # -------------------------------------------------------
 st.title("🛡️ Defence Company Intelligence Generator")
-st.markdown("*Web scraping + GPT-4o → DataBase.xlsm → Company Profile Generator*")
+st.markdown("*DuckDuckGo + Wikipedia + Yahoo Finance + GPT-4o → DataBase.xlsm → Company Profile Generator*")
 st.markdown("---")
 
 col1, col2, col3 = st.columns([2, 1.5, 1])
@@ -107,7 +106,11 @@ with col1:
 with col2:
     country = st.text_input("🌍 Pays", placeholder="ex: France, Germany, UK...")
 with col3:
-    ticker = st.text_input("📈 Ticker *(optionnel)*", placeholder="ex: HO.PA")
+    ticker = st.text_input(
+        "📈 Ticker *(optionnel)*",
+        placeholder="ex: HO.PA",
+        help="Laisse vide pour une résolution automatique depuis le nom de l'entreprise.",
+    )
 
 st.markdown("")
 generate_btn = st.button(
@@ -125,12 +128,27 @@ if generate_btn and company and country and api_key:
     # ÉTAPE 1 — Collecte
     # -------------------------------------------------------
     with st.status("🔎 Collecte des données...", expanded=True) as status:
-        st.write("Recherche DuckDuckGo + Yahoo Finance...")
+        st.write("Recherche DuckDuckGo + Wikipedia + Yahoo Finance...")
         try:
             raw_data = collect(company, country, ticker)
+
+            # Detail what was collected
+            source_labels = {
+                "overview":       "DuckDuckGo — overview",
+                "capabilities":   "DuckDuckGo — capabilities",
+                "financials_web": "DuckDuckGo — financials",
+                "relationships":  "DuckDuckGo — relationships",
+                "wikipedia":      "Wikipedia",
+                "yahoo":          "Yahoo Finance",
+            }
+            for key, label in source_labels.items():
+                v = raw_data.get(key)
+                ok = bool(v)
+                icon = "✅" if ok else "⚠️"
+                st.write(f"{icon} {label}")
+
             n_sources = sum(1 for v in raw_data.values() if v)
-            st.write(f"✅ {n_sources} sources collectées")
-            status.update(label="✅ Données collectées", state="complete")
+            status.update(label=f"✅ {n_sources}/6 sources collectées", state="complete")
         except Exception as e:
             st.error(f"❌ Erreur collecte : {e}")
             st.stop()
@@ -217,10 +235,14 @@ if generate_btn and company and country and api_key:
             ci = structured_data.get("confidence_index", "?")
             st.metric("Confiance", f"{'⭐' * int(ci)}" if str(ci).isdigit() else ci)
 
+        # Show ticker that was actually used
+        yahoo = raw_data.get("yahoo", {})
+        ticker_used = yahoo.get("ticker_used", "")
         st.markdown(
             f"**Fondée :** {structured_data.get('founded', 'N/A')}  |  "
             f"**Siège :** {structured_data.get('locations', 'N/A')}  |  "
             f"**Ownership :** {structured_data.get('type_ownership', 'N/A')}"
+            + (f"  |  **Ticker :** `{ticker_used}`" if ticker_used else "")
         )
         st.info(structured_data.get("synthetic_comment", ""))
 
@@ -233,7 +255,7 @@ if generate_btn and company and country and api_key:
 st.markdown("---")
 st.markdown(
     "<div style='text-align:center;color:gray;font-size:12px'>"
-    "Defence Intelligence Generator · DuckDuckGo + Yahoo Finance + GPT-4o → DataBase.xlsm"
+    "Defence Intelligence Generator · DuckDuckGo + Wikipedia + Yahoo Finance + GPT-4o → DataBase.xlsm"
     "</div>",
     unsafe_allow_html=True,
 )
