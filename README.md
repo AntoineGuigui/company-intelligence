@@ -1,6 +1,6 @@
-# 🛡️ Company Intelligence Generator
+# 🔍 Company Intelligence Generator
 
-Automated competitive intelligence pipeline for  companies. Generates structured company profiles from web research (DuckDuckGo + Yahoo Finance) via GPT-4o extraction, outputting directly into a `DataBase.xlsm`-compatible Excel format.
+Automated competitive intelligence pipeline. Generates structured company profiles from web research (DuckDuckGo + Wikipedia + Yahoo Finance) via GPT-4o extraction, outputting directly into a `DataBase.xlsm`-compatible Excel format.
 
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?logo=streamlit&logoColor=white)
@@ -11,13 +11,13 @@ Automated competitive intelligence pipeline for  companies. Generates structured
 
 ## 🎯 What it does
 
-For any  company, the tool:
+For any company, the tool:
 
-1. **Collects** data from the web (DuckDuckGo search) + financial data (Yahoo Finance)
-2. **Extracts** structured intelligence via GPT-4o using a -specific analysis framework
+1. **Collects** data from the web (DuckDuckGo + Wikipedia) + financial data (Yahoo Finance)
+2. **Extracts** structured intelligence via GPT-4o using a company analysis framework
 3. **Writes** results into an Excel database matching the `DataBase.xlsm` schema
 
-The output Excel is directly compatible with the [Company Profile Generator](https://github.com/AntoineGuigui/-intelligence-toolkit) — one tool feeds the other.
+The output Excel is directly compatible with the [Company Profile Generator](https://github.com/AntoineGuigui/company-intelligence-toolkit) — one tool feeds the other.
 
 ---
 
@@ -28,7 +28,9 @@ The output Excel is directly compatible with the [Company Profile Generator](htt
 │   DuckDuckGo    │────▶│                  │     │                  │
 │   Web Search    │     │   GPT-4o         │────▶│  DataBase.xlsx   │
 │                 │     │   Structured     │     │  (6 sheets)      │
-│   Yahoo Finance │────▶│   Extraction     │     │                  │
+│   Wikipedia     │────▶│   Extraction     │     │                  │
+│                 │     │                  │     │                  │
+│   Yahoo Finance │────▶│                  │     │                  │
 └─────────────────┘     └──────────────────┘     └──────────────────┘
    collector.py             extractor.py          excel_generator.py
 ```
@@ -38,7 +40,7 @@ company-intelligence/
 ├── app.py                          # Streamlit web interface
 ├── pipeline/
 │   ├── __init__.py
-│   ├── collector.py                # DuckDuckGo + Yahoo Finance scraping
+│   ├── collector.py                # DuckDuckGo + Wikipedia + Yahoo Finance
 │   ├── extractor.py                # GPT-4o structured extraction
 │   └── excel_generator.py          # Write to DataBase.xlsm format
 ├── outputs/                        # Generated Excel files
@@ -71,7 +73,7 @@ The generated Excel follows the exact schema expected by the Company Profile Gen
 |---|---|
 | Company Name | Official name |
 | Country | HQ country |
-| Field | Activity domains (`Missiles / Radar / Electronics`) |
+| Field | Activity domains |
 | Activity | 1-2 sentence summary |
 | Locations | HQ + key sites |
 | Founded | Year |
@@ -81,7 +83,7 @@ The generated Excel follows the exact schema expected by the Company Profile Gen
 | Confidence Index | 1-5 data quality rating |
 | Business Overview | Strategic summary |
 | Business relationships | Partners, customers, alliances |
-| Capability | Industrial capabilities, R&D |
+| Capability | Core capabilities, R&D |
 | Notes | Additional context, sources |
 
 ### Financial sheets (5 sheets, same structure)
@@ -100,7 +102,7 @@ Each sheet has `Company` + year columns (2022, 2023, 2024, 2025):
 In the Streamlit sidebar:
 - **OpenAI API Key**: Required (`sk-...`)
 - **Model**: `gpt-4o` (best quality) or `gpt-4o-mini` (~10x cheaper)
-- **Ticker**: Optional — improves financial data for public companies
+- **Ticker**: Optional — auto-resolved from company name for public companies
 
 ---
 
@@ -111,9 +113,9 @@ In the Streamlit sidebar:
 | Thales | France | HO.PA |
 | MBDA | France | *(private)* |
 | Rheinmetall | Germany | RHM.DE |
-| BAE Systems | UK | BA.L |
-| Leonardo | Italy | LDO.MI |
-| Safran | France | SAF.PA |
+| Apple | USA | AAPL |
+| Airbus | France | AIR.PA |
+| Siemens | Germany | SIE.DE |
 
 ---
 
@@ -136,7 +138,8 @@ Copy the generated `DataBase.xlsx` to your Company Profile Generator project fol
 |---|---|
 | Interface | Streamlit |
 | Web search | DuckDuckGo (no API key) |
-| Financial data | Yahoo Finance (yfinance) |
+| Encyclopedia | Wikipedia REST API (no API key) |
+| Financial data | Yahoo Finance (yfinance, no API key) |
 | LLM extraction | OpenAI GPT-4o / GPT-4o-mini |
 | Excel output | openpyxl |
 | HTML parsing | BeautifulSoup, lxml |
@@ -158,5 +161,5 @@ MIT — see [LICENSE](LICENSE).
 
 ## 👤 Author
 
-**Antoine Guigui** — CentraleSupélec '26
+**Antoine Guigui** — CentraleSupélec '26  
 [LinkedIn](https://www.linkedin.com/in/antoine-guigui-846266132/)
