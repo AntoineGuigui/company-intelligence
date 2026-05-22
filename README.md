@@ -1,6 +1,6 @@
-# 🛡️ Defence Company Intelligence Generator
+# 🛡️ Company Intelligence Generator
 
-Automated competitive intelligence pipeline for defence companies. Generates structured company profiles from web research (DuckDuckGo + Yahoo Finance) via GPT-4o extraction, outputting directly into a `DataBase.xlsm`-compatible Excel format.
+Automated competitive intelligence pipeline for  companies. Generates structured company profiles from web research (DuckDuckGo + Yahoo Finance) via GPT-4o extraction, outputting directly into a `DataBase.xlsm`-compatible Excel format.
 
 ![Python](https://img.shields.io/badge/Python-3.8+-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-FF4B4B?logo=streamlit&logoColor=white)
@@ -11,13 +11,13 @@ Automated competitive intelligence pipeline for defence companies. Generates str
 
 ## 🎯 What it does
 
-For any defence company, the tool:
+For any  company, the tool:
 
 1. **Collects** data from the web (DuckDuckGo search) + financial data (Yahoo Finance)
-2. **Extracts** structured intelligence via GPT-4o using a defence-specific analysis framework
+2. **Extracts** structured intelligence via GPT-4o using a -specific analysis framework
 3. **Writes** results into an Excel database matching the `DataBase.xlsm` schema
 
-The output Excel is directly compatible with the [Company Profile Generator](https://github.com/AntoineGuigui/defence-intelligence-toolkit) — one tool feeds the other.
+The output Excel is directly compatible with the [Company Profile Generator](https://github.com/AntoineGuigui/-intelligence-toolkit) — one tool feeds the other.
 
 ---
 
